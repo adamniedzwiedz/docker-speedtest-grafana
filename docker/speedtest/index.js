@@ -1,23 +1,29 @@
 const execa = require("execa");
 const Influx = require("influx");
 const delay = require("delay");
+const util = require('util');
 
-process.env.INFLUXDB_HOST = (process.env.INFLUXDB_HOST) ? process.env.INFLUXDB_HOST : 'influxdb';
-process.env.INFLUXDB_DB = (process.env.INFLUXDB_DB) ? process.env.INFLUXDB_DB : 'speedtest';
-process.env.INFLUXDB_USERNAME = (process.env.INFLUXDB_USERNAME) ? process.env.INFLUXDB_USERNAME : 'root';
-process.env.INFLUXDB_PASSWORD = (process.env.INFLUXDB_PASSWORD) ? process.env.INFLUXDB_PASSWORD : 'root';
-process.env.SPEEDTEST_HOST = (process.env.SPEEDTEST_HOST) ? process.env.SPEEDTEST_HOST : 'local';
-process.env.SPEEDTEST_INTERVAL = (process.env.SPEEDTEST_INTERVAL) ? process.env.SPEEDTEST_INTERVAL : 3600;
+const SPEEDTEST_HOST = process.env.SPEEDTEST_HOST ?? 'local';
+const SPEEDTEST_INTERVAL = process.env.SPEEDTEST_INTERVAL ?? 3600;
+const MTR_INTERVAL = process.env.MTR_INTERVAL ?? 120;
+const SPEEDTEST_SERVER = process.env.SPEEDTEST_SERVER;
+
+const influx = new Influx.InfluxDB({
+  host: process.env.INFLUXDB_HOST ?? 'influxdb',
+  database: process.env.INFLUXDB_DB ?? 'speedtest',
+  username: process.env.INFLUXDB_USERNAME ?? 'root',
+  password: process.env.INFLUXDB_PASSWORD ?? 'root',
+});
 
 const bitToMbps = bit => (bit / 1000 / 1000) * 8;
 
 const log = (message, severity = "Info") =>
-  console.log(`[${severity.toUpperCase()}][${new Date()}] ${message}`);
+    console.log(`[${severity.toUpperCase()}][${new Date()}] ${message}`);
 
 const getSpeedMetrics = async () => {
-  const args = (process.env.SPEEDTEST_SERVER) ?
-    [ "--accept-license", "--accept-gdpr", "-f", "json", "--server-id=" + process.env.SPEEDTEST_SERVER] :
-    [ "--accept-license", "--accept-gdpr", "-f", "json" ];
+  const args = (SPEEDTEST_SERVER) ?
+      [ "--accept-license", "--accept-gdpr", "-f", "json", "--server-id=" + SPEEDTEST_SERVER] :
+      [ "--accept-license", "--accept-gdpr", "-f", "json" ];
 
   const { stdout } = await execa("speedtest", args);
   const result = JSON.parse(stdout);
@@ -28,38 +34,51 @@ const getSpeedMetrics = async () => {
   };
 };
 
-const pushToInflux = async (influx, metrics) => {
+const getMtrResult = async () => {
+  const args = [ "-r", process.env.MTR_HOST ];
+
+  const { stdout } = await execa("mtr", args);
+  const mtrData = new RegExp(".*--\\s*([\\w|\\.]+)\\s*([\\d|\\.]+)%\\s*([\\d|\\.]+)\\s*([\\d|\\.]+)\\s*([\\d|\\.]+)\\s*([\\d|\\.]+)\\s*([\\d|\\.]+)\\s*([\\d|\\.]+)");
+  const lastHop = stdout.split("\n").slice(-1).toString();
+  const match = lastHop.match(mtrData);
+
+  let result = {};
+  const fields = ['loss', 'snt', 'last', 'avg', 'best', 'worst', 'stdev'];
+
+  match.slice(2).forEach((value, i) => result[fields[i]] = Number(value));
+  return result;
+};
+
+const pushToInflux = async (metrics) => {
   const points = Object.entries(metrics).map(([measurement, value]) => ({
     measurement,
-    tags: { host: process.env.SPEEDTEST_HOST },
+    tags: { host: SPEEDTEST_HOST },
     fields: { value }
   }));
-
   await influx.writePoints(points);
 };
 
-(async () => {
+const run = async (name, method, wait_sec) => {
   try {
-    const influx = new Influx.InfluxDB({
-      host: process.env.INFLUXDB_HOST,
-      database: process.env.INFLUXDB_DB,
-      username: process.env.INFLUXDB_USERNAME,
-      password: process.env.INFLUXDB_PASSWORD,
-    });
-
     while (true) {
-      log("Starting speedtest...");
-      const speedMetrics = await getSpeedMetrics();
-      log(
-        `Speedtest results - Download: ${speedMetrics.download}, Upload: ${speedMetrics.upload}, Ping: ${speedMetrics.ping}`
-      );
-      await pushToInflux(influx, speedMetrics);
+      log(`Starting ${name}...`);
+      const result = await method();
+      log(util.inspect(result, {showHidden: false, depth: null, colors: true}));
+      await pushToInflux(result);
 
-      log(`Sleeping for ${process.env.SPEEDTEST_INTERVAL} seconds...`);
-      await delay(process.env.SPEEDTEST_INTERVAL * 1000);
+      log(`${name} sleeping for ${wait_sec} seconds...`);
+      await delay(wait_sec * 1000);
     }
   } catch (err) {
     console.error(err.message);
     process.exit(1);
   }
+};
+
+(async () => {
+  await run("speedtest", getSpeedMetrics, SPEEDTEST_INTERVAL);
+})();
+
+(async () => {
+  await run("mtr", getMtrResult, MTR_INTERVAL);
 })();

@@ -1,3 +1,5 @@
-data/influxdb/*
-data/grafana/*
+data/*
+**/node_modules/
+/.idea/
 .env
+

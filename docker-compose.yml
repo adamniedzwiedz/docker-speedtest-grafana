@@ -29,10 +29,12 @@ services:
 
   speedtest:
     restart: always
-    image: frdmn/speedtest-grafana:latest
+    build: docker/speedtest
     container_name: speedtest
     environment:
-      - "SPEEDTEST_INTERVAL=${SPEEDTEST_SPEEDTEST_INTERVAL}"
+      - "SPEEDTEST_INTERVAL=${SPEEDTEST_INTERVAL}"
       - "SPEEDTEST_HOST=${SPEEDTEST_HOST}"
+      - "MTR_INTERVAL=${MTR_INTERVAL}"
+      - "MTR_HOST=${MTR_HOST}"
     depends_on:
       - influxdb

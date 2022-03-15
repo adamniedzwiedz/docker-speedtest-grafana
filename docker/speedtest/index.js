@@ -3,10 +3,11 @@ const Influx = require("influx");
 const delay = require("delay");
 const util = require('util');
 
+const SPEEDTEST_SERVER = process.env.SPEEDTEST_SERVER;
 const SPEEDTEST_HOST = process.env.SPEEDTEST_HOST ?? 'local';
 const SPEEDTEST_INTERVAL = process.env.SPEEDTEST_INTERVAL ?? 3600;
+const MTR_HOST = process.env.MTR_HOST ?? '8.8.8.8'
 const MTR_INTERVAL = process.env.MTR_INTERVAL ?? 120;
-const SPEEDTEST_SERVER = process.env.SPEEDTEST_SERVER;
 
 const influx = new Influx.InfluxDB({
   host: process.env.INFLUXDB_HOST ?? 'influxdb',
@@ -35,7 +36,7 @@ const getSpeedMetrics = async () => {
 };
 
 const getMtrResult = async () => {
-  const args = [ "-r", process.env.MTR_HOST ];
+  const args = [ "-r", MTR_HOST ];
 
   const { stdout } = await execa("mtr", args);
   const mtrData = new RegExp(".*--\\s*([\\w|\\.]+)\\s*([\\d|\\.]+)%\\s*([\\d|\\.]+)\\s*([\\d|\\.]+)\\s*([\\d|\\.]+)\\s*([\\d|\\.]+)\\s*([\\d|\\.]+)\\s*([\\d|\\.]+)");

@@ -18,7 +18,7 @@
   "gnetId": null,
   "graphTooltip": 2,
   "id": 1,
-  "iteration": 1647301177777,
+  "iteration": 1647302484853,
   "links": [],
   "panels": [
     {
@@ -40,7 +40,7 @@
           ],
           "defaults": {
             "mappings": [],
-            "max": 250,
+            "max": 1000,
             "min": 0,
             "nullValueMode": "connected",
             "thresholds": {
@@ -52,11 +52,11 @@
                 },
                 {
                   "color": "#EAB839",
-                  "value": 100
+                  "value": 350
                 },
                 {
                   "color": "dark-green",
-                  "value": 200
+                  "value": 700
                 }
               ]
             },
@@ -1042,5 +1042,5 @@
   "variables": {
     "list": []
   },
-  "version": 12
+  "version": 18
 }

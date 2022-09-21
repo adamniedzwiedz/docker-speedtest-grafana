@@ -47,6 +47,7 @@ const getMtrResult = async () => {
   const fields = ['loss', 'snt', 'last', 'avg', 'best', 'worst', 'stdev'];
 
   match.slice(2).forEach((value, i) => result[fields[i]] = Number(value));
+  result['raw'] = stdout.toString();
   return result;
 };
 

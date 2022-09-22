@@ -30,31 +30,34 @@ if __name__ == "__main__":
     token = MsToken(TOKEN_FILE)
 
     token_value = token.read()
-    if token_value is not None:
-        access_token = token_value['access_token']
-        headers = {'Authorization': 'Bearer ' + access_token}
-        request_body = {
-            'item': {
-                'description': f'Influx DB data backup at {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}',
-                'name': args.dest
-            }
-        }
+    if token_value is None:
+        logger.error('Empty token')
+        exit(1)
 
-        url = f'{base_url}/drive/items/{folder_id}:/{args.dest}:/createUploadSession'
-        logger.info('Making request to Onedrive...')
-        logger.debug(f'Url: {url}, Request body: {request_body}')
-        response = requests.post(
-            url,
-            headers=headers,
-            json=request_body
-        )
-        
-        logger.debug(f'Upload session: {response.json()}')
-        logger.info('Uploading file to Onedrive...')
-        try:
-            upload_url = response.json()['uploadUrl']
-            with open(args.source, 'rb') as fh:
-                status = requests.put(upload_url, data=fh.read())
-                logger.info(f'Status upload: {status.reason}')
-        except Exception as err:
-            logger.error(f'Failed to upload with error: {err}')
+    access_token = token_value['access_token']
+    headers = {'Authorization': 'Bearer ' + access_token}
+    request_body = {
+        'item': {
+            'description': f'Influx DB data backup at {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}',
+            'name': args.dest
+        }
+    }
+
+    url = f'{base_url}/drive/items/{folder_id}:/{args.dest}:/createUploadSession'
+    logger.info('Making request to Onedrive...')
+    logger.debug(f'Url: {url}, Request body: {request_body}')
+    response = requests.post(
+        url,
+        headers=headers,
+        json=request_body
+    )
+
+    logger.debug(f'Upload session: {response.json()}')
+    logger.info('Uploading file to Onedrive...')
+    try:
+        upload_url = response.json()['uploadUrl']
+        with open(args.source, 'rb') as fh:
+            status = requests.put(upload_url, data=fh.read())
+            logger.info(f'Status upload: {status.reason}')
+    except Exception as err:
+        logger.error(f'Failed to upload with error: {err}')
